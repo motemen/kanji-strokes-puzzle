@@ -19,11 +19,11 @@ export const Default: Story = {
 export const FilterSVG: Story = {
   args: {
     char: "神",
-    filterSVG: (svg): string => {
+    filterSVG: (svg) => {
       svg.querySelectorAll('[id^="kvg:StrokeNumbers_"]').forEach((path) => {
         path.remove();
       });
-      return svg.outerHTML;
+      return svg;
     },
   },
 };
