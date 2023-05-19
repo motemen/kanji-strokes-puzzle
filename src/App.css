@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.kanji-stroke-hidden {
+  stroke: transparent;
+  @apply transition-all duration-200;
+  .kanji-stroke-reveal & {
+    stroke: grey;
+  }
+}
