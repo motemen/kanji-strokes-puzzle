@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import useSWRImmutable from "swr/immutable";
 import { Transition } from "@headlessui/react";
 import { StringParam, useQueryParam } from "use-query-params";
@@ -7,13 +7,10 @@ import { ForwardIcon, LightBulbIcon } from "@heroicons/react/20/solid";
 import "./App.css";
 import { Kanji } from "./components/Kanji";
 
-const keepLastStroke = 2;
 interface LevelSpec {
   key: string;
   name: string;
 }
-
-type Level = LevelSpec["key"];
 
 const LEVEL_SPECS: LevelSpec[] = [
   { key: "10", name: "漢検十級" },
@@ -28,9 +25,9 @@ const LEVEL_SPECS: LevelSpec[] = [
   { key: "02", name: "漢検二級" },
 ];
 
-const filterSVG = (svg: SVGElement) => {
+const editSVGKeepStroke = (strokeCount: number) => (svg: SVGElement) => {
   const paths = svg.querySelectorAll('g[id^="kvg:StrokePaths_"] path');
-  [...paths].slice(0, -keepLastStroke).forEach((path) => {
+  [...paths].slice(0, -strokeCount).forEach((path) => {
     path.classList.add("kanji-stroke-hidden");
   });
   svg.querySelectorAll('[id^="kvg:StrokeNumbers_"]').forEach((path) => {
@@ -39,7 +36,10 @@ const filterSVG = (svg: SVGElement) => {
   return svg;
 };
 
-const KanjiText: React.FC<{ word: string | null }> = ({ word }) => {
+const KanjiText: React.FC<{
+  word: string | null;
+  filterSVG: (svg: SVGElement) => SVGElement;
+}> = ({ word, filterSVG }) => {
   const [loadCount, setLoadCount] = useState(0);
 
   const onKanjiLoaded = useCallback(() => {
@@ -77,7 +77,6 @@ const KanjiText: React.FC<{ word: string | null }> = ({ word }) => {
 };
 
 function App() {
-  const [reveal, setReveal] = useState(false);
   const [levelKey, setLevelKey] = useQueryParam("level", StringParam);
   const [level, setLevel] = useState(
     LEVEL_SPECS.find(({ key }) => key === levelKey) ?? LEVEL_SPECS[0]
@@ -85,6 +84,16 @@ function App() {
   if (level.key !== levelKey) {
     setLevelKey(level.key);
   }
+
+  const [strokeParam, setStrokeParam] = useQueryParam("n", {
+    ...StringParam,
+    default: "2",
+  });
+  const [strokeCount, _setStrokeCount] = useState(Number(strokeParam) ?? 2);
+  const setStrokeCount = (n: number) => {
+    _setStrokeCount(n);
+    setStrokeParam(n.toString());
+  };
 
   const { data: words } = useSWRImmutable(
     "/data/jawiktionary-2kanji-nouns.txt",
@@ -114,10 +123,19 @@ function App() {
     }
   );
 
+  const [reveal, setReveal] = useState(false);
+
   const resetWord = () => {
     mutateWord();
     setReveal(false);
   };
+
+  const filterSVG = useCallback(
+    (svg: SVGElement) => {
+      return editSVGKeepStroke(strokeCount)(svg);
+    },
+    [strokeCount]
+  );
 
   return (
     <div className="flex flex-col h-screen w-screen">
@@ -128,53 +146,75 @@ function App() {
           }`}
         >
           <div className="max-w-full px-4">
-            <div className="mt-8 space-x-3">
-              <label>
-                レベル:{" "}
-                <select
-                  className="px-2 py-1 border"
-                  value={level.key}
-                  onChange={(ev) => {
-                    const lv = LEVEL_SPECS.find(
-                      ({ key }) => key === ev.target.value
-                    );
-                    if (lv) {
-                      setReveal(false);
-                      setLevel(lv);
-                    }
+            <div className="mt-8">
+              <div className="mt-8 space-x-4 flex">
+                <KanjiText
+                  key={word}
+                  word={word ?? null}
+                  filterSVG={filterSVG}
+                />
+              </div>
+
+              <div className="mt-6 space-x-3">
+                <button
+                  className="bg-amber-200 hover:bg-amber-300 px-3 py-2 rounded text-lg"
+                  onClick={() => setReveal(!reveal)}
+                >
+                  <LightBulbIcon className="w-4 h-4 inline-block mr-1" />
+                  答えを見る
+                </button>
+
+                <button
+                  className="bg-amber-200 hover:bg-amber-300 px-3 py-2 rounded text-lg"
+                  onClick={() => {
+                    resetWord();
                   }}
                 >
-                  {LEVEL_SPECS.map((level) => (
-                    <option key={level.key} value={level.key}>
-                      {level.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                  <ForwardIcon className="w-4 h-4 inline-block mr-1" />
+                  次の問題
+                </button>
+              </div>
 
-            <div className="mt-8 space-x-4 flex">
-              <KanjiText key={word} word={word ?? null} />
-            </div>
+              <div className="mt-8 p-3 bg-sky-100 rounded-md space-x-4">
+                <label>
+                  レベル:{" "}
+                  <select
+                    className="px-2 py-1 border w-32"
+                    value={level.key}
+                    onChange={(ev) => {
+                      const lv = LEVEL_SPECS.find(
+                        ({ key }) => key === ev.target.value
+                      );
+                      if (lv) {
+                        setReveal(false);
+                        setLevel(lv);
+                      }
+                    }}
+                  >
+                    {LEVEL_SPECS.map((level) => (
+                      <option key={level.key} value={level.key}>
+                        {level.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <div className="mt-6 space-x-3">
-              <button
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-lg"
-                onClick={() => setReveal(true)}
-              >
-                <LightBulbIcon className="w-4 h-4 inline-block mr-1" />
-                答えを見る
-              </button>
-
-              <button
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-lg"
-                onClick={() => {
-                  resetWord();
-                }}
-              >
-                <ForwardIcon className="w-4 h-4 inline-block mr-1" />
-                次の問題
-              </button>
+                <label>
+                  <input
+                    className="px-2 py-1 border w-16 text-right"
+                    type="number"
+                    value={strokeCount}
+                    onChange={(ev) => {
+                      const n = Number(ev.target.value);
+                      if (Number.isFinite(n) && n >= 1) {
+                        setStrokeCount(n);
+                      }
+                    }}
+                    min="1"
+                  />{" "}
+                  画残す
+                </label>
+              </div>
             </div>
           </div>
         </div>
