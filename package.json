@@ -14,6 +14,7 @@
   "dependencies": {
     "@headlessui/react": "^1.7.14",
     "@heroicons/react": "^2.0.18",
+    "@vercel/og": "^0.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "swr": "^2.1.5",
